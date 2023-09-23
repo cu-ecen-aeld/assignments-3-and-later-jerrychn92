@@ -24,7 +24,7 @@ fi
 uc_num_files=`find $sz_filesdir -type f | wc -l`
 
 # read content into a string and print it
-sz_content=`grep -r $sz_searchstr *`
+uc_line_count=`grep -r $sz_searchstr $sz_filesdir | wc -l`
 
 
-echo "The number of files are $uc_num_files and the number of matching lines are $sz_content"
+echo "The number of files are $uc_num_files and the number of matching lines are $uc_line_count"
