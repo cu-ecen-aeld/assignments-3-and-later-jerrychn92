@@ -1,4 +1,11 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#define _XOPEN_SOURCE  //if we want WEXITSTATUS, etc
 
 /**
  * @param cmd the command to execute with system()
@@ -16,8 +23,14 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+    int uc_retval = 0;
+    uc_retval = system(cmd);
 
-    return true;
+    //check return value, if it's not -1 then the process is ran
+    if(uc_retval == -1)
+        return false;
+    else
+    	return true;
 }
 
 /**
@@ -39,28 +52,73 @@ bool do_exec(int count, ...)
     va_list args;
     va_start(args, count);
     char * command[count+1];
+    char * remaining_command[count];
+    const char * sz_slash_cmpstr = "/";
+    const char * sz_dash_cmpstr = "-";
     int i;
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
+	//the rest of the commands
+	if (i > 0)
+	    remaining_command[i-1] = command[i];
     }
-    command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
+   
+    //printf("\nCommand0 is: %s\n", command[0]); 
+    i = 0;
+    while ((i++) < (count-1))
+    {
+	//printf("remaining command is%s, i is %d", remaining_command[i-1], i);
+	if ((strncmp(remaining_command[i-1], sz_slash_cmpstr, strlen(sz_slash_cmpstr)) != 0) && (strncmp(remaining_command[i-1], sz_dash_cmpstr, strlen(sz_dash_cmpstr)) != 0))
+	{
+	    //printf("\narguments does not start with either - or /.");
+	    return false;
+	}
+    }
 
-/*
- * TODO:
- *   Execute a system command by calling fork, execv(),
- *   and wait instead of system (see LSP page 161).
- *   Use the command[0] as the full path to the command to execute
- *   (first argument to execv), and use the remaining arguments
- *   as second argument to the execv() command.
- *
-*/
+    // check whether the path is full path
+    if (strncmp(command[0], sz_slash_cmpstr, strlen(sz_slash_cmpstr)) != 0)
+    {
+	//printf("\ncheck first character is backslash failed.");	
+        return false;
+    }
+
+    command[count] = NULL;
+    remaining_command[count-1] = NULL;
+
+    //spawning child process now that we've verified command args
+    int uc_status;
+    pid_t child_pid;
+
+    child_pid = fork();
+
+    if (child_pid == -1)
+    {
+	//printf("\n child process not created.");
+	return false;
+    }
+    if (child_pid == 0)
+    {
+	execv(command[0], command);
+	
+	//printf("\n should never reach here on successful run.");
+	return false;
+    }
+
+    if (waitpid(child_pid, &uc_status, 0) == -1)
+    {
+	//printf("\nafter wait pid.");
+	return true;
+    }
+    else if (WIFEXITED (uc_status))
+    {
+	//printf("\nafter wifexited with status %d.", WIFEXITED (uc_status));
+	return true;
+    }
 
     va_end(args);
 
+    printf("\nreached end of function");
     return true;
 }
 
@@ -75,15 +133,35 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     va_start(args, count);
     char * command[count+1];
     int i;
+    char * remaining_command[count];
+    const char * sz_slash_cmpstr = "/";
+    const char * sz_dash_cmpstr = "-";
+
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
-    }
-    command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
 
+	if (i > 0)
+            remaining_command[i-1] = command[i];
+    }
+
+    i = 0;
+    while ((i++) < (count-1))
+    {
+        if ((strncmp(remaining_command[i-1], sz_slash_cmpstr, strlen(sz_slash_cmpstr)) != 0) && (strncmp(remaining_command[i-1], sz_dash_cmpstr, strlen(sz_dash_cmpstr)) != 0))
+        {
+            return false;
+        }
+    }
+
+    // check whether the path is full path
+    if (strncmp(command[0], sz_slash_cmpstr, strlen(sz_slash_cmpstr)) != 0)
+    {
+        return false;
+    }
+
+    command[count] = NULL;
+    remaining_command[count-1] = NULL;
 
 /*
  * TODO
@@ -92,8 +170,57 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    //spawning child process now that we've verified command args
+    int uc_status;
+
+    int fd = open(outputfile, O_CREAT | O_RDWR | O_TRUNC, 0644);
+    //terminate the program if file creation fails
+    if (fd < 0)
+    {
+	perror("open");
+	abort();
+    }
+
+    pid_t child_pid;
+
+    child_pid = fork();
+
+    if (child_pid == -1)
+    {
+        //printf("\n child process not created.");
+	close(fd);
+        return false;
+    }
+    if (child_pid == 0)
+    {
+	if (dup2(fd, 1) < 0)
+	{
+	    perror("duup2");
+	    close(fd);
+	    return false;
+	}
+        execv(command[0], command);
+
+        //printf("\n should never reach here on successful run.");
+	close(fd);
+        return false;
+    }
+
+    if (waitpid(child_pid, &uc_status, 0) == -1)
+    {
+        //printf("\nafter wait pid.");
+	close(fd);
+        return true;
+    }
+    else if (WIFEXITED (uc_status))
+    {
+	//printf("\nwifexited finished with code %d.", uc_status);
+	close(fd);
+        return true;
+    }
 
     va_end(args);
 
+    close(fd);
     return true;
 }
