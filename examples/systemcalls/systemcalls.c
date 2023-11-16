@@ -1,6 +1,6 @@
 #include "systemcalls.h"
 #include <stdlib.h>
-#include <stdio.h>
+//#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -63,12 +63,13 @@ bool do_exec(int count, ...)
 	if (i > 0)
 	    remaining_command[i-1] = command[i];
     }
-   
-    //printf("\nCommand0 is: %s\n", command[0]); 
+    
+    va_end(args);
+    printf("\nCommand0 is: %s\n", command[0]); 
     i = 0;
     while ((i++) < (count-1))
     {
-	//printf("remaining command is%s, i is %d", remaining_command[i-1], i);
+	printf("remaining command is%s, i is %d", remaining_command[i-1], i);
 	if ((strncmp(remaining_command[i-1], sz_slash_cmpstr, strlen(sz_slash_cmpstr)) != 0) && (strncmp(remaining_command[i-1], sz_dash_cmpstr, strlen(sz_dash_cmpstr)) != 0))
 	{
 	    //printf("\narguments does not start with either - or /.");
@@ -77,14 +78,14 @@ bool do_exec(int count, ...)
     }
 
     // check whether the path is full path
-    if (strncmp(command[0], sz_slash_cmpstr, strlen(sz_slash_cmpstr)) != 0)
-    {
+    //if (strncmp(command[0], sz_slash_cmpstr, strlen(sz_slash_cmpstr)) != 0)
+    //{
 	//printf("\ncheck first character is backslash failed.");	
-        return false;
-    }
+    //    return false;
+    //}
 
     command[count] = NULL;
-    remaining_command[count-1] = NULL;
+    //remaining_command[count-1] = NULL;
 
     //spawning child process now that we've verified command args
     int uc_status;
@@ -108,7 +109,7 @@ bool do_exec(int count, ...)
     if (waitpid(child_pid, &uc_status, 0) == -1)
     {
 	//printf("\nafter wait pid.");
-	return true;
+	return false;
     }
     else if (WIFEXITED (uc_status))
     {
@@ -116,10 +117,8 @@ bool do_exec(int count, ...)
 	return true;
     }
 
-    va_end(args);
-
     printf("\nreached end of function");
-    return true;
+    return false;
 }
 
 /**
@@ -133,35 +132,35 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     va_start(args, count);
     char * command[count+1];
     int i;
-    char * remaining_command[count];
-    const char * sz_slash_cmpstr = "/";
-    const char * sz_dash_cmpstr = "-";
+    //char * remaining_command[count];
+    //const char * sz_slash_cmpstr = "/";
+    //const char * sz_dash_cmpstr = "-";
 
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
 
-	if (i > 0)
-            remaining_command[i-1] = command[i];
+	//if (i > 0)
+        //    remaining_command[i-1] = command[i];
     }
 
-    i = 0;
-    while ((i++) < (count-1))
-    {
-        if ((strncmp(remaining_command[i-1], sz_slash_cmpstr, strlen(sz_slash_cmpstr)) != 0) && (strncmp(remaining_command[i-1], sz_dash_cmpstr, strlen(sz_dash_cmpstr)) != 0))
-        {
-            return false;
-        }
-    }
+    //i = 0;
+    //while ((i++) < (count-1))
+    //{
+    //    if ((strncmp(remaining_command[i-1], sz_slash_cmpstr, strlen(sz_slash_cmpstr)) != 0) && (strncmp(remaining_command[i-1], sz_dash_cmpstr, strlen(sz_dash_cmpstr)) != 0))
+    //    {
+            //return false;
+    //    }
+    //}
 
     // check whether the path is full path
-    if (strncmp(command[0], sz_slash_cmpstr, strlen(sz_slash_cmpstr)) != 0)
-    {
-        return false;
-    }
-
+    //if (strncmp(command[0], sz_slash_cmpstr, strlen(sz_slash_cmpstr)) != 0)
+    //{
+    //    return false;
+    //}
+    va_end(args);
     command[count] = NULL;
-    remaining_command[count-1] = NULL;
+    //remaining_command[count-1] = NULL;
 
 /*
  * TODO
@@ -199,6 +198,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
 	    close(fd);
 	    return false;
 	}
+
         execv(command[0], command);
 
         //printf("\n should never reach here on successful run.");
@@ -210,7 +210,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     {
         //printf("\nafter wait pid.");
 	close(fd);
-        return true;
+        return false;
     }
     else if (WIFEXITED (uc_status))
     {
@@ -219,8 +219,6 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
         return true;
     }
 
-    va_end(args);
-
     close(fd);
-    return true;
+    return false;
 }
